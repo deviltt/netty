@@ -25,7 +25,7 @@ import static io.netty.buffer.SizeClasses.LOG2_QUANTUM;
 final class PoolSubpage<T> implements PoolSubpageMetric {
 
     final PoolChunk<T> chunk;
-    final int elemSize;
+    final int elemSize; // 申请大小
     private final int pageShifts;
     private final int runOffset;
     private final int runSize;
@@ -38,6 +38,7 @@ final class PoolSubpage<T> implements PoolSubpageMetric {
     private int maxNumElems;
     private int bitmapLength;
     private int nextAvail;
+    // 由于是最小公倍数，所以肯定是申请大小的整数倍
     private int numAvail;
 
     // TODO: Test if adding padding helps under contention
@@ -57,7 +58,9 @@ final class PoolSubpage<T> implements PoolSubpageMetric {
         this.chunk = chunk;
         this.pageShifts = pageShifts;
         this.runOffset = runOffset;
-        this.runSize = runSize;
+        this.runSize = runSize; // n个page的大小
+        // 比如 pageSize（8192） 和 这次申请的内存大小 sizeIdx 对应值是28K（28672）的最小公倍数 是 57344
+        // 那 elemSize 就是 28K 的大小 28672
         this.elemSize = elemSize;
         bitmap = new long[runSize >>> 6 + LOG2_QUANTUM]; // runSize / 64 / QUANTUM
 

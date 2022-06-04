@@ -302,6 +302,7 @@ final class PoolChunk<T> implements PoolChunkMetric {
 
     boolean allocate(PooledByteBuf<T> buf, int reqCapacity, int sizeIdx, PoolThreadCache cache) {
         final long handle;
+        // 当 sizeIdx <= 38 时，表示当前分配的内存规格是 small
         if (sizeIdx <= arena.smallMaxSizeIdx) {
             // small
             handle = allocateSubpage(sizeIdx);
@@ -326,6 +327,7 @@ final class PoolChunk<T> implements PoolChunkMetric {
     }
 
     private long allocateRun(int runSize) {
+        // runSize一共需要多少页，一页= 8K
         int pages = runSize >> pageShifts;
         int pageIdx = arena.pages2pageIdx(pages);
 
@@ -338,10 +340,12 @@ final class PoolChunk<T> implements PoolChunkMetric {
 
             //get run with min offset in this queue
             LongPriorityQueue queue = runsAvail[queueIdx];
+            // 小顶堆能保证始终保持从低地址开始分配
             long handle = queue.poll();
 
             assert handle != LongPriorityQueue.NO_VALUE && !isUsed(handle) : "invalid handle: " + handle;
 
+            // 先将「handle」从该小顶堆中移除，因为我们有可能需要对它进行修改
             removeAvailRun(queue, handle);
 
             if (handle != -1) {
@@ -383,6 +387,7 @@ final class PoolChunk<T> implements PoolChunkMetric {
         if (freeBytes == chunkSize) {
             return arena.nPSizes - 1;
         }
+        // 先看看pageIdx有没有空余的，没有就递增，因为比如8放得下，那比8大的更能放得下
         for (int i = pageIdx; i < arena.nPSizes; i++) {
             LongPriorityQueue queue = runsAvail[i];
             if (queue != null && !queue.isEmpty()) {
@@ -431,8 +436,10 @@ final class PoolChunk<T> implements PoolChunkMetric {
         PoolSubpage<T> head = arena.findSubpagePoolHead(sizeIdx);
         synchronized (head) {
             //allocate a new run
+            // 获取 pageSize（8192）和 规格对应大小（sizeIdx） 的最小公倍数
             int runSize = calculateRunSize(sizeIdx);
             //runSize must be multiples of pageSize
+            // 申请若干个page，runSize是pageSize的整数倍
             long runHandle = allocateRun(runSize);
             if (runHandle < 0) {
                 return -1;
@@ -445,6 +452,8 @@ final class PoolChunk<T> implements PoolChunkMetric {
             PoolSubpage<T> subpage = new PoolSubpage<T>(head, this, pageShifts, runOffset,
                                runSize(pageShifts, runHandle), elemSize);
 
+            // 由PoolChunk记录新创建的PoolSubpage，数组索引值是首页的偏移量，这个值是唯一的，也是记录在句柄值中
+            // 因此，在归还内存时会通过句柄值找到对应的PoolSubpage对象
             subpages[runOffset] = subpage;
             return subpage.allocate();
         }
