@@ -62,7 +62,8 @@ final class PoolSubpage<T> implements PoolSubpageMetric {
         // 比如 pageSize（8192） 和 这次申请的内存大小 sizeIdx 对应值是28K（28672）的最小公倍数 是 57344
         // 那 elemSize 就是 28K 的大小 28672
         this.elemSize = elemSize;
-        bitmap = new long[runSize >>> 6 + LOG2_QUANTUM]; // runSize / 64 / QUANTUM
+        // 一个bitmap记录64个run的使用情况，bitmap的大小至少是4
+        bitmap = new long[runSize >>> 6 + LOG2_QUANTUM]; // runSize / 64 + QUANTUM
 
         doNotDestroy = true;
         if (elemSize != 0) {
