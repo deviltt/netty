@@ -157,6 +157,7 @@ abstract class PoolArena<T> extends SizeClasses implements PoolArenaMetric {
         final PoolSubpage<T> head = smallSubpagePools[sizeIdx];
         final boolean needsNormalAllocation;
         synchronized (head) {
+            // 这里为什么只找head.next下一个呢？
             final PoolSubpage<T> s = head.next;
             needsNormalAllocation = s == head;
             if (!needsNormalAllocation) {
